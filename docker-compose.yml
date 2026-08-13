@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  settlecore.api:
+    image: ${DOCKER_REGISTRY-}settlecoreapi
+    build:
+      context: .
+      dockerfile: SettleCore.Api/Dockerfile
+    ports:
+      - "5000:8080"
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: settlecore-db
+    environment:
+      POSTGRES_USER: settlecore
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: SettleCoreDb
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:alpine
+    container_name: settlecore-redis
+    ports:
+      - "6379:6379"
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: settlecore-rabbitmq
+    ports:
+      - "5672:5672"   # AMQP Protocol
+      - "15672:15672" # Management Web Dashboard
