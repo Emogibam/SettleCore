@@ -1,5 +1,6 @@
 using SettleCore.Api.Middleware;
 using StackExchange.Redis;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,10 +19,7 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwaggerUI(options =>
-    {
-        options.SwaggerEndpoint("/openapi/v1.json", "SettleCore API v1");
-    });
+    app.MapScalarApiReference();
 }
 
 app.UseMiddleware<IdempotencyMiddleware>();
