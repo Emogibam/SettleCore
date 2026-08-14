@@ -16,6 +16,14 @@ builder.Services.AddOpenApi();
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+{
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/openapi/v1.json", "SettleCore API v1");
+    });
+}
+
 app.UseMiddleware<IdempotencyMiddleware>();
 app.MapOpenApi();
 
