@@ -1,20 +1,42 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using MassTransit;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using SettleCore.Core.Contracts;
 
 namespace SettleCore.Api.Controllers;
 [ApiController]
 [Route("api/v1/[controller]")]
 public class TransfersController : ControllerBase
 {
-    [HttpPost]
-    public IActionResult InitiateTransfer([FromBody] TransferRequest request)
+    private readonly IPublishEndpoint _publishEndpoint;
+
+    public TransfersController(IPublishEndpoint publishEndpoint)
     {
-        // Returns immediate non-blocking 202 Accepted
+        _publishEndpoint = publishEndpoint;
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> InitiateTransfer([FromBody] TransferRequest request)
+    {
+        var idempotencyKey = Request.Headers["X-Idempotency-Key"].ToString();
+        var transferId = Guid.NewGuid();
+
+        // Publish event to RabbitMQ (Non-blocking!)
+        await _publishEndpoint.Publish<ITransferRequestedEvent>(new
+        {
+            TransferId = transferId,
+            SenderAccount = request.SenderAccount,
+            RecipientAccount = request.RecipientAccount,
+            Amount = request.Amount,
+            IdempotencyKey = idempotencyKey,
+            CreatedAtUtc = DateTime.UtcNow
+        });
+
         return Accepted(new
         {
-            TransferId = Guid.NewGuid(),
+            TransferId = transferId,
             Status = "PENDING_SETTLEMENT",
-            Message = "Transfer accepted for processing."
+            Message = "Transfer queued successfully for settlement processing."
         });
     }
 }
