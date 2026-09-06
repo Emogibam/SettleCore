@@ -1,4 +1,4 @@
-﻿using StackExchange.Redis;
+using StackExchange.Redis;
 
 namespace SettleCore.Api.Middleware;
 
@@ -16,6 +16,13 @@ public class IdempotencyMiddleware
     public async Task InvokeAsync(HttpContext context)
     {
         if (context.Request.Method != HttpMethods.Post)
+        {
+            await _next(context);
+            return;
+        }
+
+        // Bypass idempotency checks for mock endpoints (e.g. NIP chaos switch)
+        if (context.Request.Path.StartsWithSegments("/api/v1/mock"))
         {
             await _next(context);
             return;

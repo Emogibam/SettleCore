@@ -1,4 +1,4 @@
-﻿using MassTransit;
+using MassTransit;
 using Microsoft.Extensions.Logging;
 using SettleCore.Core.Contracts;
 using System;
@@ -20,10 +20,9 @@ public class TransferRequestedConsumer : IConsumer<ITransferRequestedEvent>
     public async Task Consume(ConsumeContext<ITransferRequestedEvent> context)
     {
         var msg = context.Message;
-        _logger.LogInformation(" [x] Received Transfer Message: TransferId={TransferId}, Amount={Amount:C}, Sender={Sender}",
+        _logger.LogInformation(" [x] Transfer Message Received & Dispatched to TransferSagaStateMachine: TransferId={TransferId}, Amount={Amount:C}, Sender={Sender}",
             msg.TransferId, msg.Amount, msg.SenderAccount);
 
-        // We will transition this to the Saga State Machine in Day 4
         await Task.CompletedTask;
     }
 }
