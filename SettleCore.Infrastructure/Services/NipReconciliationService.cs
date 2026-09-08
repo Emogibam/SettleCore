@@ -83,6 +83,25 @@ public class NipReconciliationService : INipReconciliationService
                     "[Hangfire Worker] Dispatched NipReconciliationSuccess event to MassTransit for TransferId: {TransferId}",
                     transferId);
             }
+            else if (string.Equals(statusResponse.Status, "FAILED", StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(statusResponse.Status, "REVERSED", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "[Hangfire Worker] Switch confirmed definitive FAILURE for TransferId: {TransferId}. Status: {Status}. Emitting NipReconciliationFailed.",
+                    transferId, statusResponse.Status);
+
+                var failurePayload = new NipReconciliationFailed(
+                    transferId,
+                    $"Payment switch confirmed transaction status: {statusResponse.Status}",
+                    DateTime.UtcNow
+                );
+
+                await _publishEndpoint.Publish(failurePayload);
+
+                _logger.LogInformation(
+                    "[Hangfire Worker] Dispatched NipReconciliationFailed event to MassTransit for TransferId: {TransferId}",
+                    transferId);
+            }
             else
             {
                 _logger.LogWarning(

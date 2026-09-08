@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SettleCore.NET | Real-Time Push Notification Console</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/8.0.7/signalr.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #0b0f19;
+      --bg-surface: #111827;
+      --bg-card: rgba(17, 24, 39, 0.7);
+      --border-color: rgba(255, 255, 255, 0.08);
+      --accent-indigo: #6366f1;
+      --accent-indigo-hover: #4f46e5;
+      --accent-emerald: #10b981;
+      --accent-rose: #f43f5e;
+      --accent-amber: #f59e0b;
+      --text-primary: #f9fafb;
+      --text-secondary: #9ca3af;
+      --text-muted: #6b7280;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: radial-gradient(circle at 50% 0%, #1e1b4b 0%, #0b0f19 50%);
+      color: var(--text-primary);
+      min-height: 100vh;
+      padding: 2rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 960px;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Header */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .logo-badge {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: white;
+      font-weight: 700;
+      font-size: 1.1rem;
+      padding: 0.5rem 0.8rem;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(99, 102, 241, 0.35);
+    }
+
+    .brand-text h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-text p {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+    }
+
+    .conn-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.4rem 0.9rem;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--text-muted);
+    }
+
+    .status-dot.connected {
+      background: var(--accent-emerald);
+      box-shadow: 0 0 10px var(--accent-emerald);
+    }
+
+    .status-dot.connecting {
+      background: var(--accent-amber);
+      box-shadow: 0 0 10px var(--accent-amber);
+    }
+
+    .status-dot.disconnected {
+      background: var(--accent-rose);
+    }
+
+    /* Glass Cards */
+    .card {
+      background: var(--bg-card);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      padding: 1.5rem;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    }
+
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card h2 span {
+      color: var(--accent-indigo);
+    }
+
+    /* Forms */
+    .form-group {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    input[type="text"] {
+      flex: 1;
+      min-width: 260px;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.875rem;
+      outline: none;
+      transition: all 0.2s ease;
+    }
+
+    input[type="text"]:focus {
+      border-color: var(--accent-indigo);
+      box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25);
+    }
+
+    button {
+      background: var(--accent-indigo);
+      color: white;
+      border: none;
+      border-radius: 10px;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.875rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      transition: all 0.2s ease;
+    }
+
+    button:hover {
+      background: var(--accent-indigo-hover);
+      transform: translateY(-1px);
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+
+    button.secondary:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    /* Active Groups */
+    .active-groups {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .group-tag {
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #c7d2fe;
+      padding: 0.35rem 0.75rem;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.8rem;
+    }
+
+    /* Event Stream */
+    .feed-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .feed-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 440px;
+      overflow-y: auto;
+      padding-right: 0.25rem;
+    }
+
+    .feed-container::-webkit-scrollbar {
+      width: 6px;
+    }
+    .feed-container::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+
+    .event-item {
+      background: rgba(0, 0, 0, 0.3);
+      border: 1px solid var(--border-color);
+      border-radius: 12px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .event-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .status-badge.success {
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.35);
+    }
+
+    .status-badge.failed_and_reversed {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.35);
+    }
+
+    .event-time {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .event-message {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .event-details {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      font-family: 'JetBrains Mono', monospace;
+      background: rgba(0, 0, 0, 0.25);
+      padding: 0.4rem 0.6rem;
+      border-radius: 6px;
+      word-break: break-all;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    /* Simulation Bar */
+    .quick-actions {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border-color);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Header -->
+    <header>
+      <div class="brand">
+        <div class="logo-badge">SC</div>
+        <div class="brand-text">
+          <h1>SettleCore.NET</h1>
+          <p>Real-Time Push Synchronization Console (SignalR)</p>
+        </div>
+      </div>
+
+      <div class="conn-status" id="connStatus">
+        <span class="status-dot connecting" id="statusDot"></span>
+        <span id="statusText">Connecting to WebSocket...</span>
+      </div>
+    </header>
+
+    <!-- Group Subscription Card -->
+    <div class="card">
+      <h2><span>⚡</span> Transfer Push Subscription</h2>
+      <div class="form-group">
+        <input type="text" id="transferIdInput" placeholder="Enter or generate TransferId (UUID)..." />
+        <button id="joinBtn">Join Transfer Group</button>
+        <button class="secondary" id="randomUuidBtn">New UUID</button>
+      </div>
+
+      <div class="active-groups">
+        <span style="font-size: 0.8rem; color: var(--text-muted);">Active Subscriptions:</span>
+        <div id="groupList" style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+          <span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">None yet</span>
+        </div>
+      </div>
+
+      <div class="quick-actions">
+        <span style="font-size: 0.8rem; color: var(--text-muted); width: 100%;">Quick Simulation Actions:</span>
+        <button class="secondary" id="createTransferBtn">🚀 Initiate Test Transfer & Auto-Join</button>
+        <button class="secondary" id="simSuccessBtn">🟢 Simulate Switch SUCCESS</button>
+        <button class="secondary" id="simFailBtn">🔴 Simulate Switch FAILED</button>
+      </div>
+    </div>
+
+    <!-- Live Event Feed Card -->
+    <div class="card">
+      <div class="feed-header">
+        <h2><span>📡</span> Live WebSocket Push Stream</h2>
+        <button class="secondary" id="clearFeedBtn" style="padding: 0.4rem 0.8rem; font-size: 0.75rem;">Clear Stream</button>
+      </div>
+
+      <div class="feed-container" id="feedContainer">
+        <div class="empty-state" id="emptyState">
+          Waiting for real-time push events from MassTransit...<br>
+          Join a transfer group above to start receiving live settlement updates.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const statusDot = document.getElementById("statusDot");
+    const statusText = document.getElementById("statusText");
+    const transferIdInput = document.getElementById("transferIdInput");
+    const joinBtn = document.getElementById("joinBtn");
+    const randomUuidBtn = document.getElementById("randomUuidBtn");
+    const groupList = document.getElementById("groupList");
+    const feedContainer = document.getElementById("feedContainer");
+    const emptyState = document.getElementById("emptyState");
+    const clearFeedBtn = document.getElementById("clearFeedBtn");
+    const createTransferBtn = document.getElementById("createTransferBtn");
+    const simSuccessBtn = document.getElementById("simSuccessBtn");
+    const simFailBtn = document.getElementById("simFailBtn");
+
+    const activeGroups = new Set();
+
+    // 1. Establish SignalR connection
+    const connection = new signalR.HubConnectionBuilder()
+      .withUrl("/hubs/notifications")
+      .withAutomaticReconnect()
+      .configureLogging(signalR.LogLevel.Information)
+      .build();
+
+    // 2. Listen for ReceiveTransferStatus push broadcasts
+    connection.on("ReceiveTransferStatus", (notification) => {
+      console.log("[SignalR Push Received]", notification);
+      appendNotification(notification);
+    });
+
+    // 3. Manage Connection Lifecycle
+    async function startConnection() {
+      try {
+        statusDot.className = "status-dot connecting";
+        statusText.textContent = "Connecting...";
+        await connection.start();
+        statusDot.className = "status-dot connected";
+        statusText.textContent = "Connected (WebSockets)";
+        console.log("[SignalR Connected] ConnectionId:", connection.connectionId);
+      } catch (err) {
+        statusDot.className = "status-dot disconnected";
+        statusText.textContent = "Disconnected (Retrying in 5s)";
+        console.error("[SignalR Connection Error]", err);
+        setTimeout(startConnection, 5000);
+      }
+    }
+
+    connection.onreconnecting(() => {
+      statusDot.className = "status-dot connecting";
+      statusText.textContent = "Reconnecting...";
+    });
+
+    connection.onreconnected(() => {
+      statusDot.className = "status-dot connected";
+      statusText.textContent = "Reconnected";
+      // Re-join active groups after reconnection
+      activeGroups.forEach(id => {
+        connection.invoke("JoinTransferGroup", id).catch(console.error);
+      });
+    });
+
+    connection.onclose(() => {
+      statusDot.className = "status-dot disconnected";
+      statusText.textContent = "Connection Closed";
+      setTimeout(startConnection, 5000);
+    });
+
+    // 4. Join Group Handler
+    async function joinGroup(transferId) {
+      if (!transferId) return;
+      try {
+        await connection.invoke("JoinTransferGroup", transferId);
+        activeGroups.add(transferId);
+        renderGroupList();
+        console.log(`[Group Joined] TransferId: ${transferId}`);
+      } catch (err) {
+        console.error("Failed joining transfer group", err);
+        alert("Failed to join group: " + err);
+      }
+    }
+
+    function renderGroupList() {
+      if (activeGroups.size === 0) {
+        groupList.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-muted); font-style: italic;">None yet</span>';
+        return;
+      }
+      groupList.innerHTML = Array.from(activeGroups)
+        .map(id => `<span class="group-tag">${id.substring(0, 8)}...</span>`)
+        .join("");
+    }
+
+    // 5. Append Notification to Live Stream
+    function appendNotification(item) {
+      if (emptyState) {
+        emptyState.style.display = "none";
+      }
+
+      const isSuccess = item.status && item.status.toUpperCase() === "SUCCESS";
+      const statusClass = isSuccess ? "success" : "failed_and_reversed";
+
+      const eventEl = document.createElement("div");
+      eventEl.className = "event-item";
+      eventEl.innerHTML = `
+        <div class="event-top">
+          <span class="status-badge ${statusClass}">${item.status || "UNKNOWN"}</span>
+          <span class="event-time">${new Date(item.timestampUtc || Date.now()).toLocaleTimeString()}</span>
+        </div>
+        <div class="event-message">${item.message || "No status message provided."}</div>
+        <div class="event-details">TransferId: ${item.transferId}</div>
+      `;
+
+      feedContainer.prepend(eventEl);
+    }
+
+    // Event Listeners
+    joinBtn.addEventListener("click", () => {
+      const id = transferIdInput.value.trim();
+      if (id) joinGroup(id);
+    });
+
+    randomUuidBtn.addEventListener("click", () => {
+      transferIdInput.value = crypto.randomUUID();
+    });
+
+    clearFeedBtn.addEventListener("click", () => {
+      feedContainer.innerHTML = `
+        <div class="empty-state" id="emptyState">
+          Stream cleared. Waiting for new real-time push events...
+        </div>
+      `;
+    });
+
+    // Quick Simulation: Create Transfer
+    createTransferBtn.addEventListener("click", async () => {
+      try {
+        const res = await fetch("/api/v1/transfers", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Idempotency-Key": "sim-" + crypto.randomUUID()
+          },
+          body: JSON.stringify({
+            senderAccount: "0123456789",
+            recipientAccount: "9876543210",
+            amount: 15000.00
+          })
+        });
+
+        const data = await res.json();
+        if (data.transferId) {
+          transferIdInput.value = data.transferId;
+          await joinGroup(data.transferId);
+          appendNotification({
+            transferId: data.transferId,
+            status: "PENDING_SETTLEMENT",
+            message: "Transfer initiated and queued for settlement.",
+            timestampUtc: new Date().toISOString()
+          });
+        }
+      } catch (err) {
+        alert("Failed initiating transfer: " + err);
+      }
+    });
+
+    // Quick Simulation: Poll switch with SUCCESS
+    simSuccessBtn.addEventListener("click", async () => {
+      const id = transferIdInput.value.trim();
+      if (!id) return alert("Please enter or generate a TransferId first.");
+      try {
+        const res = await fetch(`/api/v1/mock/nip/status/${id}?simulateStatus=SUCCESS`);
+        const data = await res.json();
+        console.log("Mock Switch Status Response:", data);
+      } catch (err) {
+        alert("Simulation query failed: " + err);
+      }
+    });
+
+    // Quick Simulation: Poll switch with FAILED
+    simFailBtn.addEventListener("click", async () => {
+      const id = transferIdInput.value.trim();
+      if (!id) return alert("Please enter or generate a TransferId first.");
+      try {
+        const res = await fetch(`/api/v1/mock/nip/status/${id}?simulateStatus=FAILED`);
+        const data = await res.json();
+        console.log("Mock Switch Status Response:", data);
+      } catch (err) {
+        alert("Simulation query failed: " + err);
+      }
+    });
+
+    // Initialize
+    transferIdInput.value = crypto.randomUUID();
+    startConnection();
+  </script>
+</body>
+</html>

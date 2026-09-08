@@ -60,9 +60,38 @@ public class MockNipBridgeController : ControllerBase
     }
 
     [HttpGet("status/{transferId}")]
-    public IActionResult GetTransferStatus([FromRoute] Guid transferId)
+    public IActionResult GetTransferStatus(
+        [FromRoute] Guid transferId,
+        [FromQuery] string? simulateStatus = null)
     {
-        _logger.LogInformation("Querying mock NIP switch status for TransferId: {TransferId}", transferId);
+        _logger.LogInformation(
+            "Querying mock NIP switch status for TransferId: {TransferId} (SimulateStatus: {SimulateStatus})",
+            transferId, simulateStatus);
+
+        var headerSimulateStatus = Request.Headers["X-Simulate-Status"].ToString();
+        var effectiveStatus = !string.IsNullOrWhiteSpace(simulateStatus)
+            ? simulateStatus
+            : !string.IsNullOrWhiteSpace(headerSimulateStatus)
+                ? headerSimulateStatus
+                : "SUCCESS";
+
+        if (string.Equals(effectiveStatus, "FAILED", StringComparison.OrdinalIgnoreCase))
+        {
+            var failedGuid = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
+            var failedSwitchReference = $"NIP-FAILED-{failedGuid}";
+            var failedAt = DateTime.UtcNow;
+
+            _logger.LogWarning(
+                "Mock NIP status resolved to FAILED for TransferId: {TransferId}, SwitchReference: {SwitchReference}, ReconciledAtUtc: {ReconciledAtUtc}",
+                transferId, failedSwitchReference, failedAt);
+
+            return Ok(new NipStatusResponse(
+                TransferId: transferId,
+                Status: "FAILED",
+                SwitchReference: failedSwitchReference,
+                ReconciledAtUtc: failedAt
+            ));
+        }
 
         var reconGuid = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
         var switchReference = $"NIP-RECON-{reconGuid}";

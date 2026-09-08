@@ -46,3 +46,39 @@ public record NipSwitchTimeoutEvent(
 {
     public DateTime TimedOutAtUtc { get; init; } = TimedOutAtUtc == default ? DateTime.UtcNow : TimedOutAtUtc;
 }
+
+/// <summary>
+/// Published when Hangfire reconciliation confirms a definitive failure (or exhausted retries) from the switch.
+/// </summary>
+public interface INipReconciliationFailedEvent
+{
+    Guid TransferId { get; }
+    string Reason { get; }
+    DateTime FailedAtUtc { get; }
+}
+
+public record NipReconciliationFailed(
+    Guid TransferId,
+    string Reason,
+    DateTime FailedAtUtc
+) : INipReconciliationFailedEvent;
+
+/// <summary>
+/// Saga compensation command instructing the ledger to refund the sender account.
+/// </summary>
+public interface IReverseSenderDebitCommand
+{
+    Guid TransferId { get; }
+    string SenderAccountId { get; }
+    decimal Amount { get; }
+    string FailureReason { get; }
+    DateTime TimestampUtc { get; }
+}
+
+public record ReverseSenderDebitCommand(
+    Guid TransferId,
+    string SenderAccountId,
+    decimal Amount,
+    string FailureReason,
+    DateTime TimestampUtc
+) : IReverseSenderDebitCommand;

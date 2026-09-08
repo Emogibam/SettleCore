@@ -36,8 +36,10 @@ builder.Services.AddDbContext<SettleCoreDbContext>(options =>
 // 3. MassTransit + RabbitMQ + Saga Registration
 builder.Services.AddMassTransit(x =>
 {
-    // Register the consumer
+    // Register consumers
     x.AddConsumer<TransferRequestedConsumer>();
+    x.AddConsumer<ReverseSenderDebitConsumer>();
+    x.AddConsumer<NotifyUserConsumer>();
 
     // Register TransferSagaStateMachine with EF Core PostgreSQL persistence
     x.AddSagaStateMachine<TransferSagaStateMachine, TransferState>()
@@ -84,12 +86,16 @@ builder.Services.AddHttpClient<INipReconciliationService, NipReconciliationServi
     client.BaseAddress = new Uri(mockBridgeBaseUrl);
 });
 
+builder.Services.AddSignalR();
 builder.Services.AddOpenApi();
 builder.Services.AddControllers();
 
 var app = builder.Build();
 
 app.UseMiddleware<IdempotencyMiddleware>();
+
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.MapOpenApi();
 app.MapScalarApiReference();
@@ -102,9 +108,27 @@ app.UseSwaggerUI(options =>
 // Expose Hangfire Dashboard
 app.UseHangfireDashboard("/hangfire");
 
+// Expose SignalR Notification Hub
+app.MapHub<SettleCore.Infrastructure.Hubs.NotificationHub>("/hubs/notifications");
+
 app.MapControllers();
 app.MapGet("/", () => Results.Redirect("/swagger/index.html"));
 app.MapGet("/swagger", () => Results.Redirect("/swagger/index.html"));
+
+// Automatically apply pending database migrations
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<SettleCoreDbContext>();
+    try
+    {
+        await dbContext.Database.MigrateAsync();
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogWarning(ex, "Database migration on startup was unable to reach PostgreSQL: {Message}", ex.Message);
+    }
+}
 
 app.Run();
 

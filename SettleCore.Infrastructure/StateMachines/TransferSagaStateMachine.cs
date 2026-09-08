@@ -19,10 +19,12 @@ public class TransferSagaStateMachine : MassTransitStateMachine<TransferState>
     public State PendingSettlement => PENDING_SETTLEMENT;
     public State Completed { get; private set; } = null!;
     public State Failed { get; private set; } = null!;
+    public State FailedAndReversed { get; private set; } = null!;
 
     public Event<ITransferRequestedEvent> TransferRequested { get; private set; } = null!;
     public Event<NipSwitchTimeoutEvent> SwitchTimedOut { get; private set; } = null!;
     public Event<NipReconciliationSuccess> ReconciliationSuccess { get; private set; } = null!;
+    public Event<NipReconciliationFailed> ReconciliationFailed { get; private set; } = null!;
 
     public TransferSagaStateMachine(
         ILogger<TransferSagaStateMachine>? logger = null,
@@ -37,6 +39,7 @@ public class TransferSagaStateMachine : MassTransitStateMachine<TransferState>
         Event(() => TransferRequested, x => x.CorrelateById(context => context.Message.TransferId));
         Event(() => SwitchTimedOut, x => x.CorrelateById(context => context.Message.TransferId));
         Event(() => ReconciliationSuccess, x => x.CorrelateById(context => context.Message.TransferId));
+        Event(() => ReconciliationFailed, x => x.CorrelateById(context => context.Message.TransferId));
 
         // Initial transfer intake flow
         Initially(
@@ -105,10 +108,10 @@ public class TransferSagaStateMachine : MassTransitStateMachine<TransferState>
             })
         );
 
-        // Handling out-of-process reconciliation success in PENDING_SETTLEMENT
+        // Handling out-of-process reconciliation success and failure in PENDING_SETTLEMENT
         During(PENDING_SETTLEMENT,
             When(ReconciliationSuccess)
-                .Then(context =>
+                .ThenAsync(async context =>
                 {
                     _logger?.LogInformation(
                         "Reconciliation confirmed SUCCESS for TransferId: {TransferId}. SwitchReference: {SwitchReference}. Transitioning to Completed.",
@@ -116,8 +119,49 @@ public class TransferSagaStateMachine : MassTransitStateMachine<TransferState>
 
                     context.Saga.SwitchReference = context.Message.SwitchReference;
                     context.Saga.CompletedAtUtc = context.Message.ReconciledAtUtc;
+
+                    await context.Publish<INotifyUserEvent>(new NotifyUserEvent(
+                        TransferId: context.Saga.CorrelationId,
+                        Status: "SUCCESS",
+                        Message: "Transfer completed successfully.",
+                        TimestampUtc: DateTime.UtcNow
+                    ));
+
+                    _logger?.LogInformation(
+                        "Published INotifyUserEvent (SUCCESS) for TransferId: {TransferId}",
+                        context.Saga.CorrelationId);
                 })
-                .TransitionTo(Completed)
+                .TransitionTo(Completed),
+
+            When(ReconciliationFailed)
+                .ThenAsync(async context =>
+                {
+                    _logger?.LogWarning(
+                        "NIP Reconciliation FAILED for TransferId: {TransferId}. Reason: {Reason}. Triggering automated ledger reversal compensation.",
+                        context.Saga.CorrelationId, context.Message.Reason);
+
+                    context.Saga.FailureReason = context.Message.Reason;
+
+                    await context.Publish<IReverseSenderDebitCommand>(new ReverseSenderDebitCommand(
+                        TransferId: context.Saga.CorrelationId,
+                        SenderAccountId: context.Saga.SenderAccount,
+                        Amount: context.Saga.Amount,
+                        FailureReason: context.Message.Reason,
+                        TimestampUtc: DateTime.UtcNow
+                    ));
+
+                    await context.Publish<INotifyUserEvent>(new NotifyUserEvent(
+                        TransferId: context.Saga.CorrelationId,
+                        Status: "FAILED_AND_REVERSED",
+                        Message: "Transfer failed. Your account has been credited.",
+                        TimestampUtc: DateTime.UtcNow
+                    ));
+
+                    _logger?.LogInformation(
+                        "Dispatched IReverseSenderDebitCommand and INotifyUserEvent (FAILED_AND_REVERSED) for TransferId: {TransferId}",
+                        context.Saga.CorrelationId);
+                })
+                .TransitionTo(FailedAndReversed)
         );
     }
 }
